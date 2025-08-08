@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  phone         String?   @unique
+  emailVerified Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  wallet        Wallet?
+  purchases     Purchase[]
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String   @unique
+  balance   Float    @default(0)
+  updatedAt DateTime @updatedAt
+}
+
+model Event {
+  id          String     @id @default(cuid())
+  title       String
+  slug        String     @unique
+  description String
+  location    String
+  startAt     DateTime
+  endAt       DateTime
+  price       Float
+  capacity    Int
+  createdAt   DateTime   @default(now())
+  purchases   Purchase[]
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  user       User?    @relation(fields: [userId], references: [id])
+  userId     String?
+  event      Event    @relation(fields: [eventId], references: [id])
+  eventId    String
+  amount     Float
+  currency   String   @default("NGN")
+  paid       Boolean  @default(false)
+  paymentRef String?  @unique
+  createdAt  DateTime @default(now())
+}
+
+model Reward {
+  id          String  @id @default(cuid())
+  threshold   Float
+  description String
+}
