@@ -80,3 +80,29 @@ This journal tracks all user feedback, design decisions, corrections, and revisi
     * Gamified Milestone Trackboard with animated progress bar, tier cards (Bronze/Silver/Gold/Diamond), and next-reward countdown.
   * Verified production build passes with `next build`.
 * **Next Step:** User adds Supabase credentials to `.env.local` to enable live Google OAuth and database persistence.
+
+---
+
+### Entry #004 — Full Mobile Responsiveness Overhaul & Layout Adaptation
+* **Date:** 2026-08-24
+* **User Directive:**
+  * Fix all mobile rendering and layout overlap issues across the website.
+  * Overhaul the ticketing and interactive seating area so it renders clearly, touch-friendly, and professionally on mobile screens.
+  * Push all fixes to GitHub.
+* **Actions Taken:**
+  * **Ticketing & Seating Area (`#tickets`)**:
+    * Redesigned the two-column grid into a compact mobile card on small screens + full poster on desktop.
+    * Added touch-friendly seat buttons (`touch-manipulation`, `w-6 h-6`, enhanced spacing).
+    * Added a mobile swipe indicator (`← Swipe horizontally to select seats →`).
+    * Structured the 4-step sequence cleanly: Date Selection → Tier Selection → Stage Arc & Matrix → Total Reservation / Checkout Bar.
+  * **Featured Event Card (`#featured`)**:
+    * Replaced fixed aspect-ratio collapsing with an adaptive responsive card that never overflows or clips event details on mobile.
+    * Responsive typography hierarchy and grid-based tier chips with live available tickets counter.
+  * **Hero Section**:
+    * Adapted height to `min-h-[100svh]` with `pt-28 pb-16` padding preventing navbar clipping on iOS Safari & mobile Chrome.
+    * Full-width mobile CTA buttons.
+  * **Auth & Dashboard Pages**:
+    * Optimized `auth.tsx` and `dashboard.tsx` with responsive spacing, non-overlapping stat cards, and compact mobile countdown widgets.
+  * **Build & Deployment**:
+    * Passed `npx next build` with exit code 0.
+    * Committed and pushed directly to `origin/main` (`commit 254195b`).
