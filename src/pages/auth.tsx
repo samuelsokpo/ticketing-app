@@ -92,9 +92,9 @@ export default function AuthPage() {
       <div className="min-h-screen bg-[#0B0D12] flex">
         
         {/* Left: Auth Form */}
-        <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 sm:py-12 relative w-full">
           {/* Back to home */}
-          <Link href="/" className="absolute top-6 left-6 flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors">
+          <Link href="/" className="absolute top-4 sm:top-6 left-4 sm:left-6 flex items-center gap-1.5 text-xs sm:text-sm text-slate-400 hover:text-white transition-colors">
             <ArrowLeft size={16} /> Back to home
           </Link>
 
@@ -102,14 +102,11 @@ export default function AuthPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
-            className="w-full max-w-md"
+            className="w-full max-w-md mt-6 sm:mt-0"
           >
             {/* Logo */}
-            <div className="flex items-center gap-3 mb-10">
-              <div className="relative w-10 h-10">
-                <Image src="/okpo_logo.png" alt="Okpo" fill className="object-contain" />
-              </div>
-              <span className="text-2xl font-editorial font-bold text-white">OKPO</span>
+            <div className="relative w-28 sm:w-36 h-9 sm:h-11 mb-8">
+              <Image src="/okpo_logo.png" alt="OKPO" fill priority className="object-contain object-left" />
             </div>
 
             <h1 className="text-3xl font-editorial font-bold text-white mb-2">
