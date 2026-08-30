@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -16,6 +17,7 @@ model User {
   createdAt     DateTime  @default(now())
   wallet        Wallet?
   purchases     Purchase[]
+  topUps        TopUp[]
 }
 
 model Wallet {
@@ -57,4 +59,14 @@ model Reward {
   id          String  @id @default(cuid())
   threshold   Float
   description String
+}
+
+model TopUp {
+  id         String   @id @default(cuid())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     String
+  amount     Float
+  paymentRef String   @unique
+  paid       Boolean  @default(false)
+  createdAt  DateTime @default(now())
 }

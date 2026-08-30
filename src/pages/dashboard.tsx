@@ -1,8 +1,10 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
+import Script from 'next/script';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
+import useSWR from 'swr';
 import { motion } from 'framer-motion';
 import { useAuth } from './_app';
 import { supabase } from '../lib/supabase';
@@ -36,12 +38,7 @@ const milestones = [
   { id: 'diamond', label: 'Diamond', icon: <Diamond size={18} />, tickets: 50, reward: 'VIP Upgrade', color: '#A855F7', progress: 0 },
 ];
 
-/* ─── Mock user stats (will be replaced with Supabase queries) ─── */
-const mockStats = {
-  ticketsBought: 7,
-  upcomingEvents: 2,
-  moneySpent: 145000,
-};
+/* ─── Mock data (removed mockStats in favor of API) ─── */
 
 /* ─── Upcoming events data ─── */
 const upcomingEvents = [
@@ -75,8 +72,53 @@ export default function Dashboard() {
     router.push('/');
   };
 
+  // Fetch dashboard stats
+  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const { data: dashboardData, mutate } = useSWR(session ? '/api/user/dashboard' : null, fetcher);
+
+  const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
+  const [isToppingUp, setIsToppingUp] = useState(false);
+
+  const handleTopUp = async () => {
+    if (!topUpAmount || topUpAmount < 1000) {
+      alert("Minimum top up is ₦1,000");
+      return;
+    }
+
+    setIsToppingUp(true);
+    try {
+      const res = await fetch('/api/wallet/topup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: topUpAmount })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      
+      const paystack = new (window as any).PaystackPop();
+      paystack.newTransaction({
+        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
+        email: data.email,
+        amount: Number(topUpAmount) * 100, // kobo
+        reference: data.paymentRef,
+        onSuccess: () => {
+          alert('Top up successful!');
+          setTopUpAmount('');
+          mutate(); // refresh dashboard data
+        },
+        onCancel: () => {
+          console.log('Payment cancelled');
+        }
+      });
+    } catch (err: any) {
+      alert(err.message || "Failed to initiate top up");
+    } finally {
+      setIsToppingUp(false);
+    }
+  };
+
   // Calculate milestone progress
-  const userTickets = mockStats.ticketsBought;
+  const userTickets = dashboardData?.ticketsPurchased || 0;
   const computedMilestones = milestones.map((m) => ({
     ...m,
     progress: Math.min((userTickets / m.tickets) * 100, 100),
@@ -87,7 +129,7 @@ export default function Dashboard() {
   const currentTier = [...computedMilestones].reverse().find((m) => m.unlocked);
   const nextTier = computedMilestones.find((m) => !m.unlocked);
 
-  if (loading || !session) {
+  if (loading || !session || !dashboardData) {
     return (
       <div className="min-h-screen bg-[#0B0D12] flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-[#9333EA] animate-spin" />
@@ -105,6 +147,7 @@ export default function Dashboard() {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content="Your OKPO dashboard — track tickets, events, and rewards." />
       </Head>
+      <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
 
       <div className="min-h-screen bg-[#0B0D12] text-slate-100 flex overflow-x-hidden w-full">
 
@@ -198,27 +241,64 @@ export default function Dashboard() {
 
 
           {/* ─── Stats Cards ─── */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-6 mb-8 sm:mb-10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-10">
+            {/* Wallet Balance Card (Special) */}
+            <motion.div
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 sm:p-6 rounded-2xl bg-gradient-to-br from-[#9333EA]/20 to-[#0B0D12] border border-[#9333EA]/30 hover:border-[#9333EA]/50 transition-all flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#9333EA]/20 text-[#A855F7] flex items-center justify-center">
+                    <DollarSign size={18} />
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 uppercase">Available</span>
+                </div>
+                <div className="text-2xl sm:text-3xl font-bold text-white font-mono mb-0.5">
+                  ₦{(dashboardData?.walletBalance || 0).toLocaleString()}
+                </div>
+                <div className="text-xs text-slate-400 mb-4">Wallet Balance</div>
+              </div>
+              
+              <div className="flex items-center gap-2 mt-auto">
+                <input 
+                  type="number"
+                  placeholder="Min ₦1000"
+                  value={topUpAmount}
+                  onChange={(e) => setTopUpAmount(e.target.value ? Number(e.target.value) : '')}
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#9333EA]/50 font-mono"
+                />
+                <button 
+                  onClick={handleTopUp}
+                  disabled={isToppingUp}
+                  className="px-4 py-2 bg-[#9333EA] hover:bg-[#7E22CE] text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  {isToppingUp ? 'Wait..' : 'Top Up'}
+                </button>
+              </div>
+            </motion.div>
+
             {[
               {
                 label: 'Tickets Bought',
-                value: mockStats.ticketsBought.toString(),
+                value: (dashboardData?.ticketsPurchased || 0).toString(),
                 icon: <Ticket size={18} />,
-                accent: '#9333EA',
+                accent: '#E5C07B',
                 sub: 'All time',
               },
               {
                 label: 'Upcoming Events',
-                value: mockStats.upcomingEvents.toString(),
+                value: upcomingEvents.length.toString(),
                 icon: <Calendar size={18} />,
-                accent: '#A855F7',
+                accent: '#9333EA',
                 sub: 'This month',
               },
               {
                 label: 'Money Spent',
-                value: `₦${mockStats.moneySpent.toLocaleString()}`,
+                value: `₦${(dashboardData?.totalSpent || 0).toLocaleString()}`,
                 icon: <DollarSign size={18} />,
-                accent: '#E5C07B',
+                accent: '#CD7F32',
                 sub: 'Total investment',
               },
             ].map((stat, i) => (
@@ -226,8 +306,8 @@ export default function Dashboard() {
                 key={stat.label}
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1 }}
-                className="p-4 sm:p-6 rounded-2xl glass-panel border border-white/10 hover:border-[#9333EA]/20 transition-all group"
+                transition={{ delay: (i + 1) * 0.1 }}
+                className="p-4 sm:p-6 rounded-2xl glass-panel border border-white/10 hover:border-white/20 transition-all group flex flex-col"
               >
                 <div className="flex items-center justify-between mb-3">
                   <div
@@ -238,7 +318,7 @@ export default function Dashboard() {
                   </div>
                   <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 uppercase">{stat.sub}</span>
                 </div>
-                <div className="text-2xl sm:text-3xl font-bold text-white font-mono mb-0.5">{stat.value}</div>
+                <div className="text-2xl sm:text-3xl font-bold text-white font-mono mb-0.5 mt-auto">{stat.value}</div>
                 <div className="text-xs text-slate-400">{stat.label}</div>
               </motion.div>
             ))}

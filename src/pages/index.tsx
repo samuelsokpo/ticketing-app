@@ -3,7 +3,9 @@ import Image from 'next/image';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import Link from 'next/link';
+import Script from 'next/script';
 import { useAuth } from './_app';
+import WalletWidget from '../components/WalletWidget';
 import {
   Compass,
   Heart,
@@ -102,6 +104,73 @@ export default function Home() {
   const { rows, cols, takenSeats, initialSelected } = generateSeatsGrid();
   const [selectedSeats, setSelectedSeats] = useState<Set<string>>(initialSelected);
   const [scrollY, setScrollY] = useState(0);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+
+  const handleCheckout = async () => {
+    if (!session || !user) {
+      window.location.href = '/auth';
+      return;
+    }
+    
+    if (selectedSeats.size === 0) {
+      alert("Please select at least one seat.");
+      return;
+    }
+
+    setIsCheckingOut(true);
+    const totalAmount = selectedSeats.size * selectedTierObj.priceNum;
+
+    try {
+      // Create purchase intent
+      const res = await fetch('/api/purchase', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          eventId: "cm6d2524d000109mg202h6374", // Real CUID from seed for featured event
+          paymentMethod: 'paystack',
+          amount: totalAmount
+        })
+      });
+      const data = await res.json();
+      
+      if (!data.ok) {
+        alert(data.error || 'Error initializing payment');
+        setIsCheckingOut(false);
+        return;
+      }
+
+      const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (!paystackKey) {
+        alert('Paystack key not configured');
+        setIsCheckingOut(false);
+        return;
+      }
+
+      const handler = (window as any).PaystackPop?.setup({
+        key: paystackKey,
+        email: user.email || 'customer@example.com',
+        amount: Math.round(data.amount * 100),
+        reference: data.paymentRef,
+        onClose: () => { setIsCheckingOut(false); },
+        callback: (response: any) => {
+          setIsCheckingOut(false);
+          alert('Payment successful!');
+          window.location.href = '/dashboard';
+        }
+      });
+      
+      if (handler) {
+        handler.openIframe();
+      } else {
+        alert('Paystack failed to load. Please try again.');
+        setIsCheckingOut(false);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('An error occurred');
+      setIsCheckingOut(false);
+    }
+  };
 
   useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -152,6 +221,7 @@ export default function Home() {
         <meta property="og:title" content="OKPO: Discover Amazing Buzz Happening In Your City" />
         <meta property="og:description" content="From meet and greets to grand celebrations. The Okpo experience starts here." />
       </Head>
+      <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
 
       <div className="min-h-screen bg-[#0B0D12] text-slate-100 overflow-x-hidden w-full">
 
@@ -190,24 +260,27 @@ export default function Home() {
             <div className="flex items-center gap-2 sm:gap-3">
               {session && user ? (
                 /* Logged In User State */
-                <Link
-                  href="/dashboard"
-                  className="flex items-center gap-2 sm:gap-3 glass-panel pl-1.5 sm:pl-2 pr-3 sm:pr-4 py-1 sm:py-1.5 rounded-full border border-[#9333EA]/30 hover:border-[#9333EA]/60 transition-all shadow-glow"
-                >
-                  {userAvatar ? (
-                    <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-[#9333EA]/50">
-                      <Image src={userAvatar} alt={userName} fill unoptimized className="object-cover" />
+                <>
+                  <WalletWidget />
+                  <Link
+                    href="/dashboard"
+                    className="flex items-center gap-2 sm:gap-3 glass-panel pl-1.5 sm:pl-2 pr-3 sm:pr-4 py-1 sm:py-1.5 rounded-full border border-[#9333EA]/30 hover:border-[#9333EA]/60 transition-all shadow-glow"
+                  >
+                    {userAvatar ? (
+                      <div className="relative w-7 h-7 sm:w-8 sm:h-8 rounded-full overflow-hidden border border-[#9333EA]/50">
+                        <Image src={userAvatar} alt={userName} fill unoptimized className="object-cover" />
+                      </div>
+                    ) : (
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#9333EA] to-[#E5C07B] flex items-center justify-center text-xs font-bold text-white">
+                        {userName[0]?.toUpperCase()}
+                      </div>
+                    )}
+                    <div className="flex flex-col text-xs">
+                      <span className="font-semibold text-white max-w-[90px] sm:max-w-[140px] truncate">{userName}</span>
+                      <span className="text-[9px] sm:text-[10px] text-[#A855F7] font-mono">DASHBOARD →</span>
                     </div>
-                  ) : (
-                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gradient-to-br from-[#9333EA] to-[#E5C07B] flex items-center justify-center text-xs font-bold text-white">
-                      {userName[0]?.toUpperCase()}
-                    </div>
-                  )}
-                  <div className="flex flex-col text-xs">
-                    <span className="font-semibold text-white max-w-[90px] sm:max-w-[140px] truncate">{userName}</span>
-                    <span className="text-[9px] sm:text-[10px] text-[#A855F7] font-mono">DASHBOARD →</span>
-                  </div>
-                </Link>
+                  </Link>
+                </>
               ) : (
                 /* Logged Out State */
                 <>
@@ -721,12 +794,13 @@ export default function Home() {
                           <span className="text-[10px] sm:text-xs text-[#A855F7] font-mono">({selectedSeats.size} × {selectedTierObj.price})</span>
                         </div>
                       </div>
-                      <Link
-                        href={session ? "/dashboard" : "/auth"}
-                        className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-[#9333EA] to-[#7E22CE] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-glow hover:scale-105 transition-all text-center"
+                      <button
+                        onClick={handleCheckout}
+                        disabled={isCheckingOut}
+                        className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-3.5 rounded-xl bg-gradient-to-r from-[#9333EA] to-[#7E22CE] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-glow hover:scale-105 transition-all text-center disabled:opacity-50"
                       >
-                        Proceed to Checkout <ArrowRight size={16} />
-                      </Link>
+                        {isCheckingOut ? 'Processing...' : 'Proceed to Checkout'} <ArrowRight size={16} />
+                      </button>
                     </div>
 
                   </div>
