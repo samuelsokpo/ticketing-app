@@ -41,19 +41,7 @@ const milestones = [
 /* ─── Mock data (removed mockStats in favor of API) ─── */
 
 /* ─── Upcoming events data ─── */
-const upcomingEvents = [
-  {
-    id: 1,
-    name: 'King Jfly Live In Concert',
-    date: 'Sun, 20 Sept 2026',
-    time: '18:00',
-    venue: 'The Arena Event Center',
-    tier: 'WOZA',
-    price: '₦20,000',
-    image: '/king_jfly_event.jpg',
-    daysUntil: 27,
-  },
-];
+const upcomingEvents: any[] = [];
 
 export default function Dashboard() {
   const router = useRouter();
