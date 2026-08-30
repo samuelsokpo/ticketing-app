@@ -1,51 +1,48 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
-import { createAuthenticatedClient } from '../../../lib/supabaseServer';
 import { v4 as uuidv4 } from 'uuid';
+import { getUserFromRequest, getOrCreatePrismaUser } from '../../../lib/supabaseServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { amount } = req.body;
-  if (!amount || amount < 1000) {
-    return res.status(400).json({ error: 'Minimum top up amount is ₦1,000' });
+  const numAmount = Number(amount);
+  if (!amount || isNaN(numAmount) || numAmount < 100) {
+    return res.status(400).json({ error: 'Minimum top up amount is ₦100' });
   }
 
-  // Get the access token from the Authorization header
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
-  }
-
-  const supabase = createAuthenticatedClient(token);
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
-  if (error || !user?.email) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  // 1. Authenticate user from JWT token
+  const { user: supabaseUser, error: authError } = await getUserFromRequest(req);
+  if (authError || !supabaseUser) {
+    return res.status(401).json({ error: authError || 'Unauthorized: You must be logged in' });
   }
 
   try {
-    const localUser = await prisma.user.findUnique({ where: { email: user.email } });
-    if (!localUser) {
-      return res.status(404).json({ error: 'User not found in local db. Please visit dashboard first.' });
-    }
+    // 2. Ensure Prisma local user and wallet exist
+    const localUser = await getOrCreatePrismaUser(supabaseUser);
 
-    // Generate a unique reference starting with topup_
+    // 3. Generate a unique reference starting with topup_
     const paymentRef = `topup_${uuidv4()}`;
 
-    // Create a pending TopUp record
+    // 4. Create pending TopUp record
     const topup = await prisma.topUp.create({
       data: {
         userId: localUser.id,
-        amount: Number(amount),
+        amount: numAmount,
         paymentRef,
         paid: false,
-      }
+      },
     });
 
-    res.json({ ok: true, paymentRef: topup.paymentRef, email: localUser.email });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'server error' });
+    return res.json({
+      ok: true,
+      paymentRef: topup.paymentRef,
+      email: localUser.email,
+      amount: numAmount,
+    });
+  } catch (err: any) {
+    console.error('Wallet top-up error:', err);
+    return res.status(500).json({ error: err.message || 'Server error during wallet top-up' });
   }
 }

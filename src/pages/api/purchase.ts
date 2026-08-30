@@ -1,63 +1,80 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
-import { createAuthenticatedClient } from '../../lib/supabaseServer';
+import { getUserFromRequest, getOrCreatePrismaUser, findOrEnsureEvent } from '../../lib/supabaseServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Get the access token from the Authorization header
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  // 1. Authenticate user from JWT token
+  const { user: supabaseUser, error: authError } = await getUserFromRequest(req);
+  if (authError || !supabaseUser) {
+    return res.status(401).json({ error: authError || 'Unauthorized: You must be logged in' });
   }
 
-  // Verify the token by fetching the user from Supabase
-  const supabase = createAuthenticatedClient(token);
-  const { data: { user }, error } = await supabase.auth.getUser();
-  
-  if (error || !user) {
-    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
+  const { eventId, paymentMethod = 'paystack', amount: customAmount } = req.body;
+  if (!eventId) {
+    return res.status(400).json({ error: 'Missing eventId' });
   }
-
-  const { eventId, paymentMethod, amount: customAmount } = req.body;
-  if (!eventId || !paymentMethod) return res.status(400).json({ error: 'Missing fields' });
 
   try {
-    // Look up the local user by email from the secure session
-    const localUser = await prisma.user.findUnique({ 
-      where: { email: user.email! } 
-    });
-    
-    // If localUser doesn't exist yet, we'll gracefully leave userId null
-    const userId = localUser?.id || null;
+    // 2. Ensure Prisma local user and wallet exist
+    const localUser = await getOrCreatePrismaUser(supabaseUser);
+    const userId = localUser.id;
 
-    const event = await prisma.event.findUnique({ where: { id: eventId } });
-    if (!event) return res.status(404).json({ error: 'Event not found' });
+    // 3. Find or ensure event exists in database
+    const event = await findOrEnsureEvent(eventId);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
 
-    const amount = customAmount ? Number(customAmount) : event.price;
-    // create purchase intent
+    const amount = customAmount && Number(customAmount) > 0 ? Number(customAmount) : event.price;
     const paymentRef = `txn_${uuidv4()}`;
-    const purchase = await prisma.purchase.create({ 
-      data: { userId, eventId, amount, paymentRef, paid: false } 
+
+    // 4. Create purchase record
+    const purchase = await prisma.purchase.create({
+      data: {
+        userId,
+        eventId: event.id,
+        amount,
+        paymentRef,
+        paid: false,
+      },
     });
 
+    // 5. Handle direct wallet payment
     if (paymentMethod === 'wallet') {
-      if (!userId) return res.status(400).json({ error: 'User wallet not found' });
       const wallet = await prisma.wallet.findUnique({ where: { userId } });
-      if (!wallet || wallet.balance < amount) return res.status(402).json({ error: 'Insufficient wallet balance' });
-      // debit wallet and mark purchase paid atomically
+      if (!wallet || wallet.balance < amount) {
+        return res.status(402).json({
+          error: `Insufficient wallet balance (Available: ₦${(wallet?.balance || 0).toLocaleString()}, Needed: ₦${amount.toLocaleString()})`,
+        });
+      }
+
       await prisma.$transaction([
-        prisma.wallet.update({ where: { userId }, data: { balance: { decrement: amount } } }),
-        prisma.purchase.update({ where: { id: purchase.id }, data: { paid: true } }),
+        prisma.wallet.update({
+          where: { userId },
+          data: { balance: { decrement: amount } },
+        }),
+        prisma.purchase.update({
+          where: { id: purchase.id },
+          data: { paid: true },
+        }),
       ]);
+
       return res.json({ ok: true, purchaseId: purchase.id, status: 'paid' });
     }
 
-    // For external payment (Paystack), return a payment reference for client to initialize
-    return res.json({ ok: true, purchaseId: purchase.id, paymentRef, amount, paymentUrl: null });
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: 'Server error' });
+    // 6. Handle Paystack gateway payment
+    return res.json({
+      ok: true,
+      purchaseId: purchase.id,
+      paymentRef,
+      amount,
+      email: localUser.email,
+    });
+  } catch (err: any) {
+    console.error('Purchase error:', err);
+    return res.status(500).json({ error: err.message || 'Server error during purchase' });
   }
 }

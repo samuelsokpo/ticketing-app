@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { useAuth } from './_app';
 import { supabase } from '../lib/supabase';
 import { authFetch } from '../lib/authFetch';
+import { openPaystackModal } from '../lib/paystack';
 import {
   Ticket,
   Calendar,
@@ -82,26 +83,37 @@ export default function Dashboard() {
         body: JSON.stringify({ amount: topUpAmount })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to initiate top-up');
+
+      const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (!paystackKey) {
+        alert('Paystack key not configured');
+        setIsToppingUp(false);
+        return;
+      }
       
-      const paystack = new (window as any).PaystackPop();
-      paystack.newTransaction({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
-        email: data.email,
-        amount: Number(topUpAmount) * 100, // kobo
+      const opened = openPaystackModal({
+        key: paystackKey,
+        email: data.email || user?.email || 'customer@example.com',
+        amountInKobo: Math.round(Number(topUpAmount) * 100),
         reference: data.paymentRef,
         onSuccess: () => {
-          alert('Top up successful!');
+          setIsToppingUp(false);
+          alert('Top up successful! Your wallet balance has been updated.');
           setTopUpAmount('');
-          mutate(); // refresh dashboard data
+          mutate();
         },
         onCancel: () => {
-          console.log('Payment cancelled');
+          setIsToppingUp(false);
         }
       });
+
+      if (!opened) {
+        alert('Payment gateway is loading. Please try again.');
+        setIsToppingUp(false);
+      }
     } catch (err: any) {
       alert(err.message || "Failed to initiate top up");
-    } finally {
       setIsToppingUp(false);
     }
   };

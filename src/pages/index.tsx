@@ -7,6 +7,7 @@ import Script from 'next/script';
 import { useAuth } from './_app';
 import WalletWidget from '../components/WalletWidget';
 import { authFetch } from '../lib/authFetch';
+import { openPaystackModal } from '../lib/paystack';
 import {
   Compass,
   Heart,
@@ -127,7 +128,7 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          eventId: "cm6d2524d000109mg202h6374", // Real CUID from seed for featured event
+          eventId: "cm6d2524d000109mg202h6374", // Real CUID for featured event
           paymentMethod: 'paystack',
           amount: totalAmount
         })
@@ -147,28 +148,28 @@ export default function Home() {
         return;
       }
 
-      const handler = (window as any).PaystackPop?.setup({
+      const opened = openPaystackModal({
         key: paystackKey,
-        email: user.email || 'customer@example.com',
-        amount: Math.round(data.amount * 100),
+        email: data.email || user.email || 'customer@example.com',
+        amountInKobo: Math.round(data.amount * 100),
         reference: data.paymentRef,
-        onClose: () => { setIsCheckingOut(false); },
-        callback: (response: any) => {
+        onSuccess: () => {
           setIsCheckingOut(false);
-          alert('Payment successful!');
+          alert('Payment successful! Redirecting to your dashboard...');
           window.location.href = '/dashboard';
+        },
+        onCancel: () => {
+          setIsCheckingOut(false);
         }
       });
-      
-      if (handler) {
-        handler.openIframe();
-      } else {
-        alert('Paystack failed to load. Please try again.');
+
+      if (!opened) {
+        alert('Payment gateway is loading. Please click checkout again in a moment.');
         setIsCheckingOut(false);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('An error occurred');
+      alert(err.message || 'An error occurred during checkout');
       setIsCheckingOut(false);
     }
   };

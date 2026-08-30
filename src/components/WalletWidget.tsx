@@ -3,6 +3,7 @@ import useSWR from 'swr';
 import { useAuth } from '../pages/_app';
 import { Wallet, Plus, X, Loader2 } from 'lucide-react';
 import { authFetch } from '../lib/authFetch';
+import { openPaystackModal } from '../lib/paystack';
 
 export default function WalletWidget() {
   const { session, user } = useAuth();
@@ -17,8 +18,9 @@ export default function WalletWidget() {
   const walletBalance = dashboardData?.walletBalance || 0;
 
   const handleTopUp = async () => {
-    if (!topUpAmount || topUpAmount < 1000) {
-      alert("Minimum top up is ₦1,000");
+    const num = Number(topUpAmount);
+    if (!topUpAmount || isNaN(num) || num < 100) {
+      alert('Minimum top up is ₦100');
       return;
     }
 
@@ -27,30 +29,42 @@ export default function WalletWidget() {
       const res = await authFetch('/api/wallet/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: topUpAmount })
+        body: JSON.stringify({ amount: num }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      
-      const paystack = new (window as any).PaystackPop();
-      paystack.newTransaction({
-        key: process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY,
-        email: data.email,
-        amount: Number(topUpAmount) * 100, // kobo
+      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to initialize top-up');
+
+      const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
+      if (!paystackKey) {
+        alert('Paystack key not configured');
+        setIsToppingUp(false);
+        return;
+      }
+
+      const opened = openPaystackModal({
+        key: paystackKey,
+        email: data.email || user.email || 'customer@example.com',
+        amountInKobo: Math.round(num * 100),
         reference: data.paymentRef,
         onSuccess: () => {
-          alert('Top up successful!');
+          setIsToppingUp(false);
+          alert('Top up successful! Your balance has been updated.');
           setTopUpAmount('');
           setIsOpen(false);
-          mutate(); // refresh data
+          mutate();
         },
         onCancel: () => {
-          console.log('Payment cancelled');
-        }
+          setIsToppingUp(false);
+        },
       });
+
+      if (!opened) {
+        alert('Payment gateway is loading. Please try again.');
+        setIsToppingUp(false);
+      }
     } catch (err: any) {
-      alert(err.message || "Failed to initiate top up");
-    } finally {
+      console.error(err);
+      alert(err.message || 'Failed to initiate top up');
       setIsToppingUp(false);
     }
   };
@@ -76,7 +90,7 @@ export default function WalletWidget() {
               <X size={16} />
             </button>
           </div>
-          
+
           <div className="mb-4">
             <span className="text-[10px] font-mono text-slate-500 uppercase">Available Balance</span>
             <div className="text-2xl font-bold text-white font-mono">
@@ -85,14 +99,14 @@ export default function WalletWidget() {
           </div>
 
           <div className="space-y-2">
-            <input 
+            <input
               type="number"
-              placeholder="Min ₦1000"
+              placeholder="Min ₦100"
               value={topUpAmount}
               onChange={(e) => setTopUpAmount(e.target.value ? Number(e.target.value) : '')}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#9333EA]/50 font-mono"
             />
-            <button 
+            <button
               onClick={handleTopUp}
               disabled={isToppingUp}
               className="w-full px-4 py-2 bg-[#9333EA] hover:bg-[#7E22CE] text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
