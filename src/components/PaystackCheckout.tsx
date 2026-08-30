@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../pages/_app';
 import { useRouter } from 'next/router';
 import Script from 'next/script';
+import { authFetch } from '../lib/authFetch';
 
 export default function PaystackCheckout({ event }: { event: any }) {
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,7 @@ export default function PaystackCheckout({ event }: { event: any }) {
     setLoading(true);
     try {
       // create purchase intent securely with authenticated backend
-      const res = await fetch('/api/purchase', { 
+      const res = await authFetch('/api/purchase', { 
         method: 'POST', 
         headers: { 'Content-Type': 'application/json' }, 
         body: JSON.stringify({ eventId: event.id, paymentMethod: 'paystack' }) 

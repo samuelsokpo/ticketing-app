@@ -8,6 +8,7 @@ import useSWR from 'swr';
 import { motion } from 'framer-motion';
 import { useAuth } from './_app';
 import { supabase } from '../lib/supabase';
+import { authFetch } from '../lib/authFetch';
 import {
   Ticket,
   Calendar,
@@ -61,7 +62,7 @@ export default function Dashboard() {
   };
 
   // Fetch dashboard stats
-  const fetcher = (url: string) => fetch(url).then(res => res.json());
+  const fetcher = (url: string) => authFetch(url).then(res => res.json());
   const { data: dashboardData, mutate } = useSWR(session ? '/api/user/dashboard' : null, fetcher);
 
   const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
@@ -75,7 +76,7 @@ export default function Dashboard() {
 
     setIsToppingUp(true);
     try {
-      const res = await fetch('/api/wallet/topup', {
+      const res = await authFetch('/api/wallet/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: topUpAmount })

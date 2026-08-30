@@ -1,17 +1,23 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../lib/prisma';
 import { v4 as uuidv4 } from 'uuid';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { createAuthenticatedClient } from '../../lib/supabaseServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Securely get the user from Supabase session
-  const supabase = createPagesServerClient({ req, res });
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get the access token from the Authorization header
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  // Verify the token by fetching the user from Supabase
+  const supabase = createAuthenticatedClient(token);
+  const { data: { user }, error } = await supabase.auth.getUser();
   
-  if (!session?.user) {
-    return res.status(401).json({ error: 'Unauthorized: You must be logged in' });
+  if (error || !user) {
+    return res.status(401).json({ error: 'Unauthorized: Invalid or expired token' });
   }
 
   const { eventId, paymentMethod, amount: customAmount } = req.body;
@@ -20,10 +26,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     // Look up the local user by email from the secure session
     const localUser = await prisma.user.findUnique({ 
-      where: { email: session.user.email } 
+      where: { email: user.email! } 
     });
     
-    // If localUser doesn't exist yet (e.g. no trigger setup), we'll gracefully leave userId null
+    // If localUser doesn't exist yet, we'll gracefully leave userId null
     const userId = localUser?.id || null;
 
     const event = await prisma.event.findUnique({ where: { id: eventId } });

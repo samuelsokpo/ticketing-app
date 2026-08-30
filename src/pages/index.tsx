@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Script from 'next/script';
 import { useAuth } from './_app';
 import WalletWidget from '../components/WalletWidget';
+import { authFetch } from '../lib/authFetch';
 import {
   Compass,
   Heart,
@@ -122,7 +123,7 @@ export default function Home() {
 
     try {
       // Create purchase intent
-      const res = await fetch('/api/purchase', {
+      const res = await authFetch('/api/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

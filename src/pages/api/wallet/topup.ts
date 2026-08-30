@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { createAuthenticatedClient } from '../../../lib/supabaseServer';
 import { v4 as uuidv4 } from 'uuid';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -11,17 +11,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(400).json({ error: 'Minimum top up amount is ₦1,000' });
   }
 
-  // Securely get user from Supabase session
-  const supabase = createPagesServerClient({ req, res });
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get the access token from the Authorization header
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  const supabase = createAuthenticatedClient(token);
+  const { data: { user }, error } = await supabase.auth.getUser();
   
-  if (!session?.user?.email) {
+  if (error || !user?.email) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-    if (!user) {
+    const localUser = await prisma.user.findUnique({ where: { email: user.email } });
+    if (!localUser) {
       return res.status(404).json({ error: 'User not found in local db. Please visit dashboard first.' });
     }
 
@@ -31,14 +36,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Create a pending TopUp record
     const topup = await prisma.topUp.create({
       data: {
-        userId: user.id,
+        userId: localUser.id,
         amount: Number(amount),
         paymentRef,
         paid: false,
       }
     });
 
-    res.json({ ok: true, paymentRef: topup.paymentRef, email: user.email });
+    res.json({ ok: true, paymentRef: topup.paymentRef, email: localUser.email });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'server error' });

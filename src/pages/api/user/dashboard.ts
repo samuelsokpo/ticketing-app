@@ -1,46 +1,51 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import prisma from '../../../lib/prisma';
-import { createPagesServerClient } from '@supabase/auth-helpers-nextjs';
+import { createAuthenticatedClient } from '../../../lib/supabaseServer';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Securely get the user from Supabase session
-  const supabase = createPagesServerClient({ req, res });
-  const { data: { session } } = await supabase.auth.getSession();
+  // Get the access token from the Authorization header
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized: No token provided' });
+  }
+
+  const supabase = createAuthenticatedClient(token);
+  const { data: { user }, error } = await supabase.auth.getUser();
   
-  if (!session?.user) {
+  if (error || !user?.email) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const supabaseEmail = session.user.email!;
+  const supabaseEmail = user.email;
   
   try {
     // 1. Find or create the local user
-    let user = await prisma.user.findUnique({ where: { email: supabaseEmail } });
-    if (!user) {
-      user = await prisma.user.create({
+    let localUser = await prisma.user.findUnique({ where: { email: supabaseEmail } });
+    if (!localUser) {
+      localUser = await prisma.user.create({
         data: {
           email: supabaseEmail,
-          name: session.user.user_metadata?.full_name || supabaseEmail.split('@')[0],
+          name: user.user_metadata?.full_name || supabaseEmail.split('@')[0],
         }
       });
     }
 
     // 2. Find or create the Wallet
-    let wallet = await prisma.wallet.findUnique({ where: { userId: user.id } });
+    let wallet = await prisma.wallet.findUnique({ where: { userId: localUser.id } });
     if (!wallet) {
       wallet = await prisma.wallet.create({
         data: {
-          userId: user.id,
+          userId: localUser.id,
           balance: 0,
         }
       });
     }
 
     // 3. Get Stats
-    const ticketsPurchased = await prisma.purchase.count({ where: { userId: user.id, paid: true } });
-    const total = await prisma.purchase.aggregate({ where: { userId: user.id, paid: true }, _sum: { amount: true } });
+    const ticketsPurchased = await prisma.purchase.count({ where: { userId: localUser.id, paid: true } });
+    const total = await prisma.purchase.aggregate({ where: { userId: localUser.id, paid: true }, _sum: { amount: true } });
     const totalSpent = total._sum.amount || 0;
     
     const FREE_THRESHOLD = Number(process.env.FREE_THRESHOLD || 50000);

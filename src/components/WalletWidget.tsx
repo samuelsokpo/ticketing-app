@@ -2,12 +2,12 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { useAuth } from '../pages/_app';
 import { Wallet, Plus, X, Loader2 } from 'lucide-react';
-
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+import { authFetch } from '../lib/authFetch';
 
 export default function WalletWidget() {
   const { session, user } = useAuth();
-  const { data: dashboardData, mutate } = useSWR(session?.user ? '/api/user/dashboard' : null, fetcher);
+  const authSWRFetcher = (url: string) => authFetch(url).then((res) => res.json());
+  const { data: dashboardData, mutate } = useSWR(session?.user ? '/api/user/dashboard' : null, authSWRFetcher);
   const [isOpen, setIsOpen] = useState(false);
   const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
   const [isToppingUp, setIsToppingUp] = useState(false);
@@ -24,7 +24,7 @@ export default function WalletWidget() {
 
     setIsToppingUp(true);
     try {
-      const res = await fetch('/api/wallet/topup', {
+      const res = await authFetch('/api/wallet/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: topUpAmount })
