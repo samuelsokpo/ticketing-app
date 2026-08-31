@@ -3,11 +3,8 @@ import Image from 'next/image';
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, useInView } from 'framer-motion';
 import Link from 'next/link';
-import Script from 'next/script';
 import { useAuth } from './_app';
-import WalletWidget from '../components/WalletWidget';
 import { authFetch } from '../lib/authFetch';
-import { openPaystackModal } from '../lib/paystack';
 import {
   Compass,
   Heart,
@@ -123,13 +120,11 @@ export default function Home() {
     const totalAmount = selectedSeats.size * selectedTierObj.priceNum;
 
     try {
-      // Create purchase intent
       const res = await authFetch('/api/purchase', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          eventId: "cm6d2524d000109mg202h6374", // Real CUID for featured event
-          paymentMethod: 'paystack',
+          eventId: "cm6d2524d000109mg202h6374",
           amount: totalAmount
         })
       });
@@ -141,32 +136,14 @@ export default function Home() {
         return;
       }
 
-      const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-      if (!paystackKey) {
-        alert('Paystack key not configured');
-        setIsCheckingOut(false);
+      // Redirect to Paystack hosted checkout
+      if (data.authorization_url) {
+        window.location.href = data.authorization_url;
         return;
       }
 
-      const opened = openPaystackModal({
-        key: paystackKey,
-        email: data.email || user.email || 'customer@example.com',
-        amountInKobo: Math.round(data.amount * 100),
-        reference: data.paymentRef,
-        onSuccess: () => {
-          setIsCheckingOut(false);
-          alert('Payment successful! Redirecting to your dashboard...');
-          window.location.href = '/dashboard';
-        },
-        onCancel: () => {
-          setIsCheckingOut(false);
-        }
-      });
-
-      if (!opened) {
-        alert('Payment gateway is loading. Please click checkout again in a moment.');
-        setIsCheckingOut(false);
-      }
+      alert('Could not get payment URL. Please try again.');
+      setIsCheckingOut(false);
     } catch (err: any) {
       console.error(err);
       alert(err.message || 'An error occurred during checkout');
@@ -223,7 +200,7 @@ export default function Home() {
         <meta property="og:title" content="OKPO: Discover Amazing Buzz Happening In Your City" />
         <meta property="og:description" content="From meet and greets to grand celebrations. The Okpo experience starts here." />
       </Head>
-      <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
+
 
       <div className="min-h-screen bg-[#0B0D12] text-slate-100 overflow-x-hidden w-full">
 
@@ -263,7 +240,7 @@ export default function Home() {
               {session && user ? (
                 /* Logged In User State */
                 <>
-                  <WalletWidget />
+
                   <Link
                     href="/dashboard"
                     className="flex items-center gap-2 sm:gap-3 glass-panel pl-1.5 sm:pl-2 pr-3 sm:pr-4 py-1 sm:py-1.5 rounded-full border border-[#9333EA]/30 hover:border-[#9333EA]/60 transition-all shadow-glow"

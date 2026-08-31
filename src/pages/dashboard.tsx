@@ -1,7 +1,6 @@
 import Head from 'next/head';
 import Image from 'next/image';
 import Link from 'next/link';
-import Script from 'next/script';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import useSWR from 'swr';
@@ -9,7 +8,6 @@ import { motion } from 'framer-motion';
 import { useAuth } from './_app';
 import { supabase } from '../lib/supabase';
 import { authFetch } from '../lib/authFetch';
-import { openPaystackModal } from '../lib/paystack';
 import {
   Ticket,
   Calendar,
@@ -66,57 +64,24 @@ export default function Dashboard() {
   const fetcher = (url: string) => authFetch(url).then(res => res.json());
   const { data: dashboardData, mutate } = useSWR(session ? '/api/user/dashboard' : null, fetcher);
 
-  const [topUpAmount, setTopUpAmount] = useState<number | ''>('');
-  const [isToppingUp, setIsToppingUp] = useState(false);
+  const [paymentMessage, setPaymentMessage] = useState<string | null>(null);
 
-  const handleTopUp = async () => {
-    if (!topUpAmount || topUpAmount < 1000) {
-      alert("Minimum top up is ₦1,000");
-      return;
+  // Handle payment callback result from URL query params
+  useEffect(() => {
+    const { payment, msg } = router.query;
+    if (payment === 'success') {
+      setPaymentMessage('🎉 Payment successful! Your ticket has been confirmed.');
+      mutate(); // refresh dashboard data
+      // Clean up URL
+      router.replace('/dashboard', undefined, { shallow: true });
+    } else if (payment === 'failed') {
+      setPaymentMessage(`❌ Payment failed: ${msg || 'Please try again.'}`);  
+      router.replace('/dashboard', undefined, { shallow: true });
+    } else if (payment === 'error') {
+      setPaymentMessage(`⚠️ Payment verification error: ${msg || 'Please contact support.'}`);  
+      router.replace('/dashboard', undefined, { shallow: true });
     }
-
-    setIsToppingUp(true);
-    try {
-      const res = await authFetch('/api/wallet/topup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: topUpAmount })
-      });
-      const data = await res.json();
-      if (!res.ok || !data.ok) throw new Error(data.error || 'Failed to initiate top-up');
-
-      const paystackKey = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY;
-      if (!paystackKey) {
-        alert('Paystack key not configured');
-        setIsToppingUp(false);
-        return;
-      }
-      
-      const opened = openPaystackModal({
-        key: paystackKey,
-        email: data.email || user?.email || 'customer@example.com',
-        amountInKobo: Math.round(Number(topUpAmount) * 100),
-        reference: data.paymentRef,
-        onSuccess: () => {
-          setIsToppingUp(false);
-          alert('Top up successful! Your wallet balance has been updated.');
-          setTopUpAmount('');
-          mutate();
-        },
-        onCancel: () => {
-          setIsToppingUp(false);
-        }
-      });
-
-      if (!opened) {
-        alert('Payment gateway is loading. Please try again.');
-        setIsToppingUp(false);
-      }
-    } catch (err: any) {
-      alert(err.message || "Failed to initiate top up");
-      setIsToppingUp(false);
-    }
-  };
+  }, [router.query]);
 
   // Calculate milestone progress
   const userTickets = dashboardData?.ticketsPurchased || 0;
@@ -148,7 +113,6 @@ export default function Dashboard() {
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="description" content="Your OKPO dashboard — track tickets, events, and rewards." />
       </Head>
-      <Script src="https://js.paystack.co/v1/inline.js" strategy="lazyOnload" />
 
       <div className="min-h-screen bg-[#0B0D12] text-slate-100 flex overflow-x-hidden w-full">
 
@@ -241,9 +205,31 @@ export default function Dashboard() {
           </motion.div>
 
 
+
+          {/* ─── Payment Result Banner ─── */}
+          {paymentMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={`mb-6 p-4 rounded-xl border text-sm font-medium ${
+                paymentMessage.includes('successful')
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-red-500/10 border-red-500/30 text-red-300'
+              }`}
+            >
+              {paymentMessage}
+              <button
+                onClick={() => setPaymentMessage(null)}
+                className="ml-4 text-xs underline opacity-70 hover:opacity-100"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          )}
+
           {/* ─── Stats Cards ─── */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-10">
-            {/* Wallet Balance Card (Special) */}
+            {/* Total Spent Card (Special) */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
@@ -254,29 +240,12 @@ export default function Dashboard() {
                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#9333EA]/20 text-[#A855F7] flex items-center justify-center">
                     <DollarSign size={18} />
                   </div>
-                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 uppercase">Available</span>
+                  <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 uppercase">Total</span>
                 </div>
                 <div className="text-2xl sm:text-3xl font-bold text-white font-mono mb-0.5">
-                  ₦{(dashboardData?.walletBalance || 0).toLocaleString()}
+                  ₦{(dashboardData?.totalSpent || 0).toLocaleString()}
                 </div>
-                <div className="text-xs text-slate-400 mb-4">Wallet Balance</div>
-              </div>
-              
-              <div className="flex items-center gap-2 mt-auto">
-                <input 
-                  type="number"
-                  placeholder="Min ₦1000"
-                  value={topUpAmount}
-                  onChange={(e) => setTopUpAmount(e.target.value ? Number(e.target.value) : '')}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#9333EA]/50 font-mono"
-                />
-                <button 
-                  onClick={handleTopUp}
-                  disabled={isToppingUp}
-                  className="px-4 py-2 bg-[#9333EA] hover:bg-[#7E22CE] text-white rounded-lg text-sm font-bold disabled:opacity-50 transition-colors whitespace-nowrap"
-                >
-                  {isToppingUp ? 'Wait..' : 'Top Up'}
-                </button>
+                <div className="text-xs text-slate-400">Money Spent</div>
               </div>
             </motion.div>
 
@@ -296,11 +265,11 @@ export default function Dashboard() {
                 sub: 'This month',
               },
               {
-                label: 'Money Spent',
-                value: `₦${(dashboardData?.totalSpent || 0).toLocaleString()}`,
-                icon: <DollarSign size={18} />,
+                label: 'Free Ticket Progress',
+                value: `${dashboardData?.progressPercent || 0}%`,
+                icon: <Gift size={18} />,
                 accent: '#CD7F32',
-                sub: 'Total investment',
+                sub: 'Spend ₦50k for free',
               },
             ].map((stat, i) => (
               <motion.div
