@@ -4,7 +4,7 @@ export const DEFAULT_EVENTS = [
     title: 'King Jfly Live In Concert',
     slug: 'king-jfly-live',
     description: 'Experience the electric energy of King Jfly live on stage. An unforgettable night of music, passion, and star-studded performances.',
-    location: 'The Arena Event Center, Lagos',
+    location: 'The Arena Event Center, Port Harcourt',
     startAt: new Date('2026-09-20T18:00:00Z'),
     endAt: new Date('2026-09-20T23:00:00Z'),
     price: 20000,

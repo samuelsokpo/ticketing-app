@@ -46,7 +46,7 @@ const upcomingEvents: any[] = [];
 export default function Dashboard() {
   const router = useRouter();
   const { session, user, loading } = useAuth();
-  const [activeNav, setActiveNav] = useState('home');
+  const [activeNav, setActiveNav] = useState('dashboard');
 
   // Redirect to auth if not logged in
   useEffect(() => {
@@ -129,13 +129,16 @@ export default function Dashboard() {
           <nav className="flex flex-col items-center gap-4 flex-1">
             {[
               { id: 'home', icon: <Home size={20} />, label: 'Home' },
-              { id: 'explore', icon: <Compass size={20} />, label: 'Explore' },
-              { id: 'tickets', icon: <Ticket size={20} />, label: 'Tickets' },
+              { id: 'dashboard', icon: <Ticket size={20} />, label: 'Tickets & Stats' },
               { id: 'favorites', icon: <Heart size={20} />, label: 'Favorites' },
+              { id: 'settings', icon: <Settings size={20} />, label: 'Settings' },
             ].map((item) => (
               <button
                 key={item.id}
-                onClick={() => setActiveNav(item.id)}
+                onClick={() => {
+                  if (item.id === 'home') router.push('/');
+                  else setActiveNav(item.id);
+                }}
                 title={item.label}
                 className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                   activeNav === item.id
@@ -150,7 +153,7 @@ export default function Dashboard() {
 
           {/* Bottom */}
           <div className="flex flex-col items-center gap-4">
-            <button title="Settings" className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-white/5 hover:text-white transition-all">
+            <button onClick={() => setActiveNav('settings')} title="Settings" className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${activeNav === 'settings' ? 'bg-[#9333EA]/20 text-[#A855F7]' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}>
               <Settings size={20} />
             </button>
             <button onClick={handleLogout} title="Logout" className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-all">
@@ -228,7 +231,9 @@ export default function Dashboard() {
           )}
 
           {/* ─── Stats Cards ─── */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-10">
+          {activeNav === 'dashboard' && (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-8 sm:mb-10">
             {/* Total Spent Card (Special) */}
             <motion.div
               initial={{ opacity: 0, y: 15 }}
@@ -493,20 +498,24 @@ export default function Dashboard() {
               )}
             </div>
           </motion.div>
-
+          </>
+          )}
 
           {/* Mobile Bottom Nav */}
           <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
             <div className="glass-panel border-t border-white/10 px-6 py-2.5 flex items-center justify-around bg-[#0B0D12]/95 backdrop-blur-xl">
               {[
                 { id: 'home', icon: <Home size={18} />, label: 'Home' },
-                { id: 'explore', icon: <Compass size={18} />, label: 'Explore' },
-                { id: 'tickets', icon: <Ticket size={18} />, label: 'Tickets' },
+                { id: 'dashboard', icon: <Ticket size={18} />, label: 'Tickets' },
+                { id: 'favorites', icon: <Heart size={18} />, label: 'Favorites' },
                 { id: 'settings', icon: <Settings size={18} />, label: 'Settings' },
               ].map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveNav(item.id)}
+                  onClick={() => {
+                    if (item.id === 'home') router.push('/');
+                    else setActiveNav(item.id);
+                  }}
                   className={`flex flex-col items-center gap-0.5 transition-all ${
                     activeNav === item.id ? 'text-[#A855F7]' : 'text-slate-500'
                   }`}
@@ -517,6 +526,52 @@ export default function Dashboard() {
               ))}
             </div>
           </div>
+
+          {activeNav === 'favorites' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center justify-center py-20">
+              <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-slate-400 mb-4">
+                <Heart size={32} />
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">No Favorites Yet</h2>
+              <p className="text-slate-400 text-sm max-w-sm text-center">
+                Events you favorite will appear here. Start exploring to find events you love.
+              </p>
+              <button onClick={() => router.push('/')} className="mt-6 px-6 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white font-medium transition-all">
+                Explore Events
+              </button>
+            </motion.div>
+          )}
+
+          {activeNav === 'settings' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-xl">
+              <h2 className="text-2xl font-bold text-white mb-6">Settings</h2>
+              
+              <div className="space-y-6">
+                <div className="p-6 rounded-xl border border-white/10 bg-white/5">
+                  <h3 className="font-bold text-white mb-1">Profile Information</h3>
+                  <p className="text-sm text-slate-400 mb-4">Update your account details</p>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs text-slate-400 uppercase font-mono block mb-1">Email Address</label>
+                      <input disabled type="email" value={user?.email || ''} className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-2 text-slate-300 opacity-70 cursor-not-allowed" />
+                    </div>
+                    <button className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-all">
+                      Change Password
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-6 rounded-xl border border-white/10 bg-white/5">
+                  <h3 className="font-bold text-white mb-1">Support</h3>
+                  <p className="text-sm text-slate-400 mb-4">Need help with your tickets or account?</p>
+                  <a href="mailto:support@okpogroup.com" className="inline-flex px-4 py-2 bg-[#9333EA] hover:bg-[#7E22CE] text-white rounded-lg text-sm font-medium transition-all">
+                    Contact Support
+                  </a>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
         </main>
       </div>

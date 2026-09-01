@@ -471,7 +471,7 @@ export default function Home() {
                       <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-300 mb-5">
                         <span className="flex items-center gap-1.5">
                           <MapPin size={14} className="text-[#A855F7] flex-shrink-0" />
-                          The Arena Event Center · Lagos
+                          The Arena Event Center · Port Harcourt
                         </span>
                         <span className="text-slate-600">•</span>
                         <span className="flex items-center gap-1.5">
@@ -861,9 +861,9 @@ export default function Home() {
                     <Link href={session ? "/dashboard" : "/auth"} className="group px-8 sm:px-10 py-3.5 sm:py-4 rounded-full bg-gradient-to-r from-[#9333EA] to-[#7E22CE] text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-glow hover:scale-105 transition-all text-center">
                       {session ? "Open Dashboard" : "Get Started"} <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
-                    <button className="px-8 sm:px-10 py-3.5 sm:py-4 rounded-full bg-white/5 border border-white/15 text-white font-medium text-xs sm:text-sm hover:bg-white/10 transition-all text-center">
+                    <a href="mailto:support@okpogroup.com" className="px-6 sm:px-8 py-3.5 sm:py-4 rounded-xl border border-white/10 hover:border-white/30 text-white font-bold transition-all hover:bg-white/5">
                       List Your Event
-                    </button>
+                    </a>
                   </div>
                 </div>
               </div>
@@ -890,7 +890,7 @@ export default function Home() {
                 <h4 className="text-xs font-mono text-[#A855F7] tracking-widest mb-3 sm:mb-4 font-bold">PLATFORM</h4>
                 <ul className="space-y-2.5 text-xs sm:text-sm text-slate-400">
                   <li><a href="#featured" className="hover:text-white transition-colors">Browse Events</a></li>
-                  <li><a href="#" className="hover:text-white transition-colors">List Your Event</a></li>
+                  <li><a href="mailto:support@okpogroup.com" className="hover:text-white transition-colors">List Your Event</a></li>
                   <li><a href="#" className="hover:text-white transition-colors">Pricing</a></li>
                   <li><a href="#" className="hover:text-white transition-colors">VIP Membership</a></li>
                 </ul>
