@@ -189,10 +189,10 @@ export default function Home() {
 
   // Ticket Tiers with availability
   const ticketTiers = [
-    { name: 'BALENCIAGA', price: '₦5,000', priceNum: 5000, left: 500, color: 'from-slate-700 to-slate-800' },
-    { name: 'WOZA', price: '₦20,000', priceNum: 20000, left: 200, color: 'from-[#9333EA] to-[#7E22CE]' },
-    { name: 'KALAKUTA', price: '₦500,000', priceNum: 500000, left: 20, color: 'from-[#E5C07B] to-[#D4A853]' },
-    { name: 'BAD', price: '₦1,000,000', priceNum: 1000000, left: 10, color: 'from-red-600 to-red-800' },
+    { name: 'BALENCIAGA', price: '₦5,000', priceNum: 5000, left: kingJflyEvent?.tierRemaining?.BALENCIAGA ?? 500, color: 'from-slate-700 to-slate-800' },
+    { name: 'WOZA', price: '₦20,000', priceNum: 20000, left: kingJflyEvent?.tierRemaining?.WOZA ?? 200, color: 'from-[#9333EA] to-[#7E22CE]' },
+    { name: 'KALAKUTA', price: '₦500,000', priceNum: 500000, left: kingJflyEvent?.tierRemaining?.KALAKUTA ?? 20, color: 'from-[#E5C07B] to-[#D4A853]' },
+    { name: 'BAD', price: '₦1,000,000', priceNum: 1000000, left: kingJflyEvent?.tierRemaining?.BAD ?? 10, color: 'from-red-600 to-red-800' },
   ];
 
   const selectedTierObj = ticketTiers.find((t) => t.name === activeTier) || ticketTiers[1];
@@ -340,11 +340,11 @@ export default function Home() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
-                className="text-4xl sm:text-6xl lg:text-7xl font-editorial font-extrabold leading-[1.1] sm:leading-[1.05] tracking-tight text-white mb-4 sm:mb-6"
+                className="text-4xl sm:text-5xl lg:text-7xl font-sans font-medium leading-[1.1] sm:leading-[1.15] tracking-tight text-white mb-6 sm:mb-8"
               >
                 Discover the
                 <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#A855F7] to-[#E5C07B]">
+                <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#A855F7] to-[#E5C07B] font-semibold">
                   amazing buzz
                 </span>
                 <br />

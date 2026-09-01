@@ -33,14 +33,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Enrich with real purchase counts and remaining tickets
     const enriched = await Promise.all(
       events.map(async (e) => {
-        const ticketsSold = await prisma.purchase.count({ where: { eventId: e.id, paid: true } });
+        const purchases = await prisma.purchase.findMany({ where: { eventId: e.id, paid: true }, select: { amount: true } });
+        const ticketsSold = purchases.length;
         const ticketsRemaining = Math.max(0, e.capacity - ticketsSold);
+        
+        let balenciagaSold = 0; let wozaSold = 0; let kalakutaSold = 0; let badSold = 0;
+        for (const p of purchases) {
+          if (p.amount === 5000) balenciagaSold++;
+          else if (p.amount === 20000) wozaSold++;
+          else if (p.amount === 500000) kalakutaSold++;
+          else if (p.amount === 1000000) badSold++;
+        }
+        
         return {
           ...e,
           purchaseCount: ticketsSold,
           ticketsSold,
           ticketsRemaining,
           soldOut: ticketsRemaining === 0,
+          tierRemaining: {
+            BALENCIAGA: Math.max(0, 500 - balenciagaSold),
+            WOZA: Math.max(0, 200 - wozaSold),
+            KALAKUTA: Math.max(0, 20 - kalakutaSold),
+            BAD: Math.max(0, 10 - badSold),
+          }
         };
       })
     );

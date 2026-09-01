@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       LIMIT 12;`;
 
     // Safely serialize BigInt values and compute remaining tickets
-    const safe = raw.map((row: any) => {
+    const safe = await Promise.all(raw.map(async (row: any) => {
       const obj: any = {};
       for (const [key, value] of Object.entries(row)) {
         obj[key] = typeof value === 'bigint' ? Number(value) : value;
@@ -22,8 +22,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       obj.ticketsSold = obj.tickets_sold || 0;
       obj.ticketsRemaining = Math.max(0, (obj.capacity || 0) - obj.ticketsSold);
       obj.soldOut = obj.ticketsRemaining === 0;
+
+      const purchases = await prisma.purchase.findMany({ where: { eventId: obj.id, paid: true }, select: { amount: true } });
+      let balenciagaSold = 0; let wozaSold = 0; let kalakutaSold = 0; let badSold = 0;
+      for (const p of purchases) {
+          if (p.amount === 5000) balenciagaSold++;
+          else if (p.amount === 20000) wozaSold++;
+          else if (p.amount === 500000) kalakutaSold++;
+          else if (p.amount === 1000000) badSold++;
+      }
+      obj.tierRemaining = {
+          BALENCIAGA: Math.max(0, 500 - balenciagaSold),
+          WOZA: Math.max(0, 200 - wozaSold),
+          KALAKUTA: Math.max(0, 20 - kalakutaSold),
+          BAD: Math.max(0, 10 - badSold),
+      };
+
       return obj;
-    });
+    }));
 
     res.json({ ok: true, events: safe });
   } catch (err) {
