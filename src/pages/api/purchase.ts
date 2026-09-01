@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // 5. Initialize transaction on Paystack server-side
     //    This returns an authorization_url the client redirects to.
-    const callbackUrl = `${req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'https://ticketing-app-sandy-three.vercel.app'}/api/payment/callback`;
+    const callbackUrl = `${req.headers.origin || process.env.NEXT_PUBLIC_APP_URL || 'https://okpogroup.com'}/api/payment/callback`;
 
     const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
