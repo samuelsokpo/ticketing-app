@@ -5,6 +5,9 @@ import { motion, useInView } from 'framer-motion';
 import Link from 'next/link';
 import { useAuth } from './_app';
 import { authFetch } from '../lib/authFetch';
+import useSWR from 'swr';
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
 import {
   Compass,
   Heart,
@@ -105,7 +108,12 @@ export default function Home() {
   const [scrollY, setScrollY] = useState(0);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
+  const { data: hotTakes } = useSWR('/api/events/hot-takes', fetcher);
+  const kingJflyEvent = hotTakes?.events?.find((e: any) => e.slug === 'king-jfly-live' || e.id === 'cm6d2524d000109mg202h6374');
+  const isSoldOut = kingJflyEvent?.soldOut;
+
   const handleCheckout = async () => {
+    if (isSoldOut) return;
     if (!session || !user) {
       window.location.href = '/auth';
       return;
@@ -419,7 +427,7 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5 text-[11px] sm:text-xs font-mono text-slate-400">
-                  <span className="text-[#00E676]">●</span> 730 Left
+                  <span className={isSoldOut ? "text-red-500" : "text-[#00E676]"}>●</span> {kingJflyEvent?.ticketsRemaining !== undefined ? kingJflyEvent.ticketsRemaining : 730} Left
                 </div>
               </div>
             </Reveal>

@@ -30,6 +30,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(404).json({ error: 'Event not found' });
     }
 
+    // 4. CHECK TICKET AVAILABILITY — security gate to prevent overselling
+    const ticketsSold = await prisma.purchase.count({
+      where: { eventId: event.id, paid: true },
+    });
+    const ticketsRemaining = event.capacity - ticketsSold;
+    if (ticketsRemaining <= 0) {
+      return res.status(409).json({
+        error: 'SOLD OUT — All tickets for this event have been purchased.',
+        soldOut: true,
+      });
+    }
+
     const amount = customAmount && Number(customAmount) > 0 ? Number(customAmount) : event.price;
     const paymentRef = `txn_${uuidv4()}`;
 

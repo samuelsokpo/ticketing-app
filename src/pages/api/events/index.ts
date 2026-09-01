@@ -30,11 +30,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       events = await prisma.event.findMany({ take, orderBy: { startAt: 'asc' } });
     }
 
-    // Enrich with real purchase counts
+    // Enrich with real purchase counts and remaining tickets
     const enriched = await Promise.all(
       events.map(async (e) => {
-        const purchases = await prisma.purchase.count({ where: { eventId: e.id, paid: true } });
-        return { ...e, purchaseCount: purchases };
+        const ticketsSold = await prisma.purchase.count({ where: { eventId: e.id, paid: true } });
+        const ticketsRemaining = Math.max(0, e.capacity - ticketsSold);
+        return {
+          ...e,
+          purchaseCount: ticketsSold,
+          ticketsSold,
+          ticketsRemaining,
+          soldOut: ticketsRemaining === 0,
+        };
       })
     );
 

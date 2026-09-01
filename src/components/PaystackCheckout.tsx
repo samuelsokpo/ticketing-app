@@ -52,10 +52,20 @@ export default function PaystackCheckout({ event }: { event: any }) {
       </div>
       <button
         onClick={startCheckout}
-        disabled={loading}
-        className="w-full px-6 py-3.5 rounded-xl bg-gradient-to-r from-[#9333EA] to-[#7E22CE] text-white font-bold text-sm shadow-glow hover:scale-[1.02] transition-all disabled:opacity-50"
+        disabled={loading || event.soldOut}
+        className={`w-full px-6 py-3.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 ${
+          event.soldOut 
+            ? 'bg-slate-700 text-slate-400 cursor-not-allowed' 
+            : 'bg-gradient-to-r from-[#9333EA] to-[#7E22CE] text-white shadow-glow hover:scale-[1.02]'
+        }`}
       >
-        {loading ? 'Redirecting to payment...' : user ? 'Buy Ticket' : 'Sign in to buy'}
+        {event.soldOut 
+          ? 'Sold Out' 
+          : loading 
+            ? 'Redirecting to payment...' 
+            : user 
+              ? 'Buy Ticket' 
+              : 'Sign in to buy'}
       </button>
     </div>
   );
